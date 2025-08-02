@@ -16,6 +16,7 @@ make_request() {
     local endpoint=$2
     local data=$3
     local description=$4
+    local expected_status=$5
     
     echo ""
     echo "📋 Test: $description"
@@ -35,6 +36,11 @@ make_request() {
     http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
     body=$(echo "$response" | sed '/HTTP_STATUS:/d')
     
+    if [[ "$http_status" -ne "$expected_status" ]]; then
+        echo "❌ Unexpected status: $http_status (Expected: $expected_status)"
+    else
+        echo "✅ Status matches expected: $http_status"
+    fi
     echo "Status: $http_status"
     echo "Response: $body"
     
@@ -52,14 +58,14 @@ make_request "POST" "/tasks" '{
     "title": "Complete API testing",
     "description": "Test all endpoints of the Task Manager API",
     "status": "pending"
-}' "Create a new task"
+}' "Create a new task" "201"
 
 # Test 2: Get all tasks
-make_request "GET" "/tasks" "" "Get all tasks"
+make_request "GET" "/tasks" "" "Get all tasks" "200"
 
 # Test 3: Get task by ID (using the created task ID)
 if [ -n "$TASK_ID" ]; then
-    make_request "GET" "/tasks/$TASK_ID" "" "Get task by ID ($TASK_ID)"
+    make_request "GET" "/tasks/$TASK_ID" "" "Get task by ID ($TASK_ID)" "200"
 fi
 
 # Test 4: Update the task
@@ -68,7 +74,7 @@ if [ -n "$TASK_ID" ]; then
         "title": "Complete API testing - Updated",
         "description": "Test all endpoints of the Task Manager API - Updated description",
         "status": "in-progress"
-    }' "Update task ($TASK_ID)"
+    }' "Update task ($TASK_ID)" "200"
 fi
 
 # Test 5: Create another task for filtering test
@@ -76,42 +82,42 @@ make_request "POST" "/tasks" '{
     "title": "Second task",
     "description": "This task is for testing filters",
     "status": "completed"
-}' "Create second task"
+}' "Create second task" "201"
 
 # Test 6: Filter tasks by status
-make_request "GET" "/tasks?status=completed" "" "Filter tasks by status (completed)"
+make_request "GET" "/tasks?status=completed" "" "Filter tasks by status (completed)" "200"
 
 # Test 7: Filter tasks by status (in-progress)
-make_request "GET" "/tasks?status=in-progress" "" "Filter tasks by status (in-progress)"
+make_request "GET" "/tasks?status=in-progress" "" "Filter tasks by status (in-progress)" "200"  
 
 # Test 8: Test invalid status filter
-make_request "GET" "/tasks?status=invalid" "" "Test invalid status filter"
+make_request "GET" "/tasks?status=invalid" "" "Test invalid status filter" "400"
 
 # Test 9: Test getting non-existent task
-make_request "GET" "/tasks/999" "" "Get non-existent task"
+make_request "GET" "/tasks/999" "" "Get non-existent task"  "404"
 
 # Test 10: Test invalid task creation
 make_request "POST" "/tasks" '{
     "description": "Task without title",
     "status": "invalid-status"
-}' "Create task with validation errors"
+}' "Create task with validation errors" "400"
 
 # Test 11: Delete the first task
 if [ -n "$TASK_ID" ]; then
-    make_request "DELETE" "/tasks/$TASK_ID" "" "Delete task ($TASK_ID)"
+    make_request "DELETE" "/tasks/$TASK_ID" "" "Delete task ($TASK_ID)" "200"
 fi
 
 # Test 12: Try to get deleted task
 if [ -n "$TASK_ID" ]; then
-    make_request "GET" "/tasks/$TASK_ID" "" "Try to get deleted task ($TASK_ID)"
+    make_request "GET" "/tasks/$TASK_ID" "" "Try to get deleted task ($TASK_ID)"  "404"
 fi
 
 # Test 13: Test invalid endpoints
-make_request "GET" "/invalid" "" "Test invalid endpoint"
+make_request "GET" "/invalid" "" "Test invalid endpoint" "404"
 
 # Test 14: Test invalid method
-make_request "PATCH" "/tasks" "" "Test invalid HTTP method"
-
+make_request "PATCH" "/tasks" "" "Test invalid HTTP method" "405"
+    
 echo ""
 echo "🎉 API Testing Complete!"
 echo "=================================="
